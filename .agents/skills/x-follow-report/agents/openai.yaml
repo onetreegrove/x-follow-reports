@@ -1,0 +1,4 @@
+interface:
+  display_name: "X 关注流报告"
+  short_description: "分析你的 X 关注流"
+  default_prompt: "使用 $x-follow-report 抓取我的 X 关注流，并生成一份简洁的信息分析报告。"

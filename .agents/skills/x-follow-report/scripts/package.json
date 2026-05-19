@@ -1,0 +1,12 @@
+{
+  "name": "x-follow-report-scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "baoyu-chrome-cdp": "^0.1.0"
+  },
+  "devDependencies": {}
+}
