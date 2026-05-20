@@ -66,7 +66,7 @@ YYYY-MM/DD/HHMMSS-晚报.md
 
 ## 素材 JSON
 
-脚本通过 `--materials-file` 或 `--materials-json` 输出素材，核心字段：
+脚本默认向 stdout 打印素材 JSON；传入 `--materials-file` 时写入指定文件。核心字段：
 
 - `reportKind`
 - `generatedAt`

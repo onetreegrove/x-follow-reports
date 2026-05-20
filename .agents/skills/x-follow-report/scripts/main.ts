@@ -6,11 +6,10 @@ import readline from "node:readline";
 
 import { DEFAULT_CONFIG, loadExtendConfigWithWarnings, mergeConfig, parseExtendConfigText, parseExtendConfigTextWithWarnings } from "./config.js";
 import { hasRequiredCookies, loadCookies, saveCookies } from "./cookies.js";
-import { formatLocalTimestamp, formatReport, reportKind } from "./markdown.js";
 import { buildReportMaterials } from "./materials.js";
 import { resolveConsentPath } from "./paths.js";
 import { extractTimelineTweets } from "./timeline.js";
-import type { NormalizedTweet, ReportMaterials, RunConfig, TimelineKind, WriteRunOptions, WriteRunResult } from "./types.js";
+import type { NormalizedTweet, ReportKind, ReportMaterials, RunConfig, TimelineKind, WriteMaterialOptions } from "./types.js";
 import { fetchTimelinePage } from "./xapi.js";
 
 export { parseExtendConfigText, parseExtendConfigTextWithWarnings };
@@ -22,7 +21,6 @@ type CliArgs = Partial<RunConfig> & {
   login: boolean;
   json: boolean;
   acceptDanger: boolean;
-  materialsJson: boolean;
   materialsFile?: string;
 };
 
@@ -47,11 +45,8 @@ function printUsage(exitCode: number): never {
   --output-dir <path>             输出根目录，默认当前项目根目录
   --include-replies               包含回复
   --no-reposts                    排除转发
-  --download-media                已弃用；素材始终记录媒体 URL，当前不会下载二进制文件
-  --language <lang>               报告语言，默认 zh-CN
   --accept-danger                 非交互环境中接受非官方接口免责声明
   --json                          输出 JSON 摘要
-  --materials-json                 输出报告素材 JSON 到 stdout，不写 Markdown
   --materials-file <path>          输出报告素材 JSON 到指定文件
   --login                         通过 Chrome 登录/刷新 cookie
   --help, -h                      显示帮助
@@ -65,23 +60,20 @@ function printUsage(exitCode: number): never {
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { help: false, login: false, json: false, acceptDanger: false, materialsJson: false };
+  const args: CliArgs = { help: false, login: false, json: false, acceptDanger: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === "--help" || a === "-h") args.help = true;
     else if (a === "--login") args.login = true;
     else if (a === "--json") args.json = true;
-    else if (a === "--materials-json") args.materialsJson = true;
     else if (a === "--materials-file") args.materialsFile = requireValue(a, argv[++i]);
     else if (a === "--accept-danger") args.acceptDanger = true;
     else if (a === "--include-replies") args.includeReplies = true;
     else if (a === "--no-reposts") args.includeReposts = false;
-    else if (a === "--download-media") args.downloadMedia = true;
     else if (a === "--timeline") args.timeline = parseTimelineValue(argv[++i]);
     else if (a === "--max-items") args.maxItems = parseIntValue(a, argv[++i]);
     else if (a === "--lookback-hours") args.lookbackHours = parseIntValue(a, argv[++i]);
     else if (a === "--output-dir") args.outputDir = requireValue(a, argv[++i]);
-    else if (a === "--language") args.reportLanguage = requireValue(a, argv[++i]);
     else throw new Error(`未知参数：${a}`);
   }
   return args;
@@ -102,6 +94,27 @@ function parseTimelineValue(value: string | undefined): TimelineKind {
   const raw = requireValue("--timeline", value);
   if (raw !== "following" && raw !== "home") throw new Error("--timeline 只能是 following 或 home");
   return raw;
+}
+
+export function formatLocalTimestamp(date: Date): string {
+  const formatter = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  return formatter.format(date).replace(" ", "T");
+}
+
+function reportKind(now: Date): ReportKind {
+  const hour = Number(formatLocalTimestamp(now).slice(11, 13));
+  if (hour < 12) return "早报";
+  if (hour < 14) return "午报";
+  return "晚报";
 }
 
 async function promptYesNo(question: string): Promise<boolean> {
@@ -170,16 +183,7 @@ function sourceLabel(timeline: TimelineKind): string {
   return timeline === "home" ? "X 主页时间线" : "X 关注时间线";
 }
 
-export async function writeRunOutputs(options: WriteRunOptions): Promise<WriteRunResult> {
-  const now = options.now ?? new Date();
-  const pathToReport = reportPath(options.outputDir, now);
-  await mkdir(path.dirname(pathToReport), { recursive: true });
-  const reportContent = await formatReport({ ...options, now });
-  await writeFile(pathToReport, reportContent, "utf8");
-  return { reportPath: pathToReport, itemsAnalyzed: options.tweets.length };
-}
-
-export async function writeMaterialOutputs(options: WriteRunOptions): Promise<ReportMaterials> {
+export async function writeMaterialOutputs(options: WriteMaterialOptions): Promise<ReportMaterials> {
   const now = options.now ?? new Date();
   const pathToReport = reportPath(options.outputDir, now);
   return buildReportMaterials({
@@ -197,6 +201,11 @@ export async function writeMaterialOutputs(options: WriteRunOptions): Promise<Re
   });
 }
 
+export function formatMaterialsJson(materials: ReportMaterials, options: { rawTweets?: NormalizedTweet[] } = {}): string {
+  const payload = options.rawTweets ? { ...materials, rawTweets: options.rawTweets } : materials;
+  return JSON.stringify(payload, null, 2);
+}
+
 type FetchTimelinePage = typeof fetchTimelinePage;
 
 export async function collectTimeline(
@@ -205,7 +214,7 @@ export async function collectTimeline(
   log: (message: string) => void,
   fetchPage: FetchTimelinePage = fetchTimelinePage
 ) {
-  const rawPages: unknown[] = [];
+  let pageCount = 0;
   const tweets: NormalizedTweet[] = [];
   const seen = new Set<string>();
   const errors: string[] = [];
@@ -231,7 +240,7 @@ export async function collectTimeline(
       }
       throw error;
     }
-    rawPages.push(page);
+    pageCount++;
 
     const extracted = extractTimelineTweets(page, {
       timeline: config.timeline,
@@ -252,14 +261,14 @@ export async function collectTimeline(
       if (tweets.length >= config.maxItems) break;
     }
     emptyPages = added === 0 ? emptyPages + 1 : 0;
-    log(`[x-follow-report] 页面 ${rawPages.length}: 新增 ${added} 条，累计 ${tweets.length} 条。`);
+    log(`[x-follow-report] 页面 ${pageCount}: 新增 ${added} 条，累计 ${tweets.length} 条。`);
 
     cursor = extracted.bottomCursor;
     const allExtractedTweetsAreOld = extracted.tweets.length > 0 && withinLookback === 0;
     if (!cursor || allExtractedTweetsAreOld || emptyPages >= 2) break;
   }
 
-  return { rawPages, tweets, skipped, errors };
+  return { tweets, skipped, errors };
 }
 
 async function main(): Promise<void> {
@@ -289,47 +298,22 @@ async function main(): Promise<void> {
   const periodStart = new Date(Date.now() - config.lookbackHours * 60 * 60 * 1000).toISOString();
   const collection = await collectTimeline(config, cookieMap, log);
 
-  if (cli.materialsJson || cli.materialsFile) {
-    const materials = await writeMaterialOutputs({
-      tweets: collection.tweets,
-      rawPages: [],
-      outputDir: config.outputDir,
-      timeline: config.timeline,
-      periodStart,
-      periodEnd,
-      language: config.reportLanguage,
-      skipped: collection.skipped,
-      errors: collection.errors,
-      warnings: configWarnings,
-    });
-    const materialText = JSON.stringify(materials, null, 2);
-    if (cli.materialsFile) {
-      await mkdir(path.dirname(cli.materialsFile), { recursive: true });
-      await writeFile(cli.materialsFile, materialText, "utf8");
-      console.log(cli.materialsFile);
-    } else {
-      console.log(materialText);
-    }
-    return;
-  }
-
-  const result = await writeRunOutputs({
+  const materials = await writeMaterialOutputs({
     tweets: collection.tweets,
-    rawPages: collection.rawPages,
     outputDir: config.outputDir,
     timeline: config.timeline,
     periodStart,
     periodEnd,
-    language: config.reportLanguage,
     skipped: collection.skipped,
     errors: collection.errors,
     warnings: configWarnings,
   });
-
-  if (cli.json) {
-    console.log(JSON.stringify({ ...result, tweets: collection.tweets }, null, 2));
+  if (cli.materialsFile) {
+    await mkdir(path.dirname(cli.materialsFile), { recursive: true });
+    await writeFile(cli.materialsFile, formatMaterialsJson(materials), "utf8");
+    console.log(cli.materialsFile);
   } else {
-    console.log(result.reportPath);
+    console.log(formatMaterialsJson(materials, { rawTweets: cli.json ? collection.tweets : undefined }));
   }
 }
 

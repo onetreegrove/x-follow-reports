@@ -7,8 +7,6 @@ export type RunConfig = {
   lookbackHours: number;
   includeReplies: boolean;
   includeReposts: boolean;
-  downloadMedia: boolean;
-  reportLanguage: string;
 };
 
 export type Metrics = {
@@ -46,23 +44,16 @@ export type TimelineExtractionResult = {
   skipped: number;
 };
 
-export type WriteRunOptions = {
+export type WriteMaterialOptions = {
   tweets: NormalizedTweet[];
-  rawPages: unknown[];
   outputDir: string;
   timeline: TimelineKind;
   periodStart: string;
   periodEnd: string;
-  language: string;
   skipped: number;
   errors: string[];
   warnings?: string[];
   now?: Date;
-};
-
-export type WriteRunResult = {
-  reportPath: string;
-  itemsAnalyzed: number;
 };
 
 export type ReportKind = "早报" | "午报" | "晚报";

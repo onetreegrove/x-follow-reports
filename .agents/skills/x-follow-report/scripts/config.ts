@@ -17,8 +17,6 @@ export const DEFAULT_CONFIG: RunConfig = {
   lookbackHours: 24,
   includeReplies: false,
   includeReposts: true,
-  downloadMedia: false,
-  reportLanguage: "zh-CN",
 };
 
 type PartialConfig = Partial<RunConfig>;
@@ -87,13 +85,6 @@ export function parseExtendConfigTextWithWarnings(text: string): ParsedConfig {
       const parsed = parseBoolean(value);
       if (parsed !== undefined) config.includeReposts = parsed;
       else warnings.push({ line: lineNumber, message: "include_reposts 必须是布尔值" });
-    } else if (key === "download_media") {
-      const parsed = parseBoolean(value);
-      if (parsed !== undefined) config.downloadMedia = parsed;
-      else warnings.push({ line: lineNumber, message: "download_media 必须是布尔值" });
-    } else if (key === "report_language") {
-      if (value) config.reportLanguage = value;
-      else warnings.push({ line: lineNumber, message: "report_language 不能为空" });
     } else {
       warnings.push({ line: lineNumber, message: `未知配置项：${key}` });
     }
