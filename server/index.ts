@@ -5,7 +5,9 @@ import { createReportIndex } from "./reportIndex";
 import type { PublishReportInput } from "./types";
 
 const port = Number(process.env.PORT || 8787);
-const root = process.env.REPORT_ROOT ? path.resolve(process.env.REPORT_ROOT) : process.cwd();
+const root = process.env.REPORT_ROOT
+  ? path.resolve(process.env.REPORT_ROOT)
+  : path.join(process.cwd(), ".x-follow-report", "report-outputs");
 const uploadToken = process.env.REPORT_UPLOAD_TOKEN;
 const index = createReportIndex(root);
 

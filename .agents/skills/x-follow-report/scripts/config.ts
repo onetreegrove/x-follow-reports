@@ -11,7 +11,7 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, "../../../..");
 
 export const DEFAULT_CONFIG: RunConfig = {
-  outputDir: PROJECT_ROOT,
+  outputDir: path.join(PROJECT_ROOT, ".x-follow-report", "report-outputs"),
   timeline: "following",
   maxItems: 100,
   lookbackHours: 24,
