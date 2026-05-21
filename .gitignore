@@ -11,3 +11,6 @@ x_home.html
 .env
 .env.*
 !.env.example
+
+# X Follow Report Data Dir
+.x-follow-report/
