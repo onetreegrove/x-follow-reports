@@ -6,7 +6,9 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  web:
     dependencies:
       '@vitejs/plugin-vue':
         specifier: ^5.2.0

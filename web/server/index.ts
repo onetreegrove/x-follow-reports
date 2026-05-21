@@ -1,13 +1,16 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { createReportIndex } from "./reportIndex";
 import type { PublishReportInput } from "./types";
 
 const port = Number(process.env.PORT || 8787);
+const defaultRoot = path.join(process.cwd(), ".x-follow-report", "report-outputs");
+const parentRoot = path.join(process.cwd(), "..", ".x-follow-report", "report-outputs");
 const root = process.env.REPORT_ROOT
   ? path.resolve(process.env.REPORT_ROOT)
-  : path.join(process.cwd(), ".x-follow-report", "report-outputs");
+  : (existsSync(parentRoot) ? parentRoot : defaultRoot);
 const uploadToken = process.env.REPORT_UPLOAD_TOKEN;
 const index = createReportIndex(root);
 
