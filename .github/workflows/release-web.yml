@@ -35,11 +35,37 @@ jobs:
       - name: Build web
         run: pnpm build
 
-      - name: Package web build
+      - name: Package deployable web service
         run: |
           mkdir -p release-assets
-          tar -czf release-assets/x-follow-report-web.tar.gz -C web/dist .
-          (cd web/dist && zip -r ../../release-assets/x-follow-report-web.zip .)
+          mkdir -p release-package/web
+          cp README.md release-package/
+          cp web/package.json release-package/web/package.json
+          cp -R web/server-dist release-package/web/server-dist
+          cp -R web/dist release-package/web/dist
+          cat > release-package/DEPLOY.md <<'EOF'
+          # Deploy x-follow-report web service
+
+          ## Requirements
+
+          - Node.js 22 or newer
+
+          ## Start
+
+          ```bash
+          export PORT=8787
+          export REPORT_ROOT=/data/x-follow-report/report-outputs
+          export REPORT_UPLOAD_TOKEN='replace-with-a-long-random-token'
+
+          cd web
+          node server-dist/index.js
+          ```
+
+          The service listens on `127.0.0.1:${PORT}` and serves both the web UI and `/api/reports`.
+          Put it behind a reverse proxy such as Nginx for public access.
+          EOF
+          tar -czf release-assets/x-follow-report-web-service.tar.gz -C release-package .
+          (cd release-package && zip -r ../release-assets/x-follow-report-web-service.zip .)
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

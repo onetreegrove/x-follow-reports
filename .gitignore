@@ -1,5 +1,6 @@
 node_modules/
 dist/
+server-dist/
 .pnpm-store/
 .superpowers/
 .agents/tmp_*.json
