@@ -1,0 +1,59 @@
+name: Release web build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-web:
+    name: Build and publish web release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web
+        run: pnpm build
+
+      - name: Package web build
+        run: |
+          mkdir -p release-assets
+          tar -czf release-assets/x-follow-report-web.tar.gz -C web/dist .
+          (cd web/dist && zip -r ../../release-assets/x-follow-report-web.zip .)
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x-follow-report-web
+          path: release-assets/*
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('web-{0}', github.run_number) }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || format('Web build {0}', github.run_number) }}
+          make_latest: ${{ github.ref_type == 'tag' }}
