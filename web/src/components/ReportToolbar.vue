@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ThemeName, ThemePreference } from "../theme";
 import type { ReportKind } from "../types/report";
 
 defineProps<{
@@ -6,17 +7,30 @@ defineProps<{
   selectedKinds: Set<ReportKind>;
   loading: boolean;
   sidebarCollapsed: boolean;
+  themePreference: ThemePreference;
+  activeTheme: ThemeName;
   totalCount: number;
   visibleCount: number;
 }>();
 const emit = defineEmits<{
   "update:query": [value: string];
+  "update:themePreference": [value: ThemePreference];
   toggleKind: [kind: ReportKind];
   refresh: [];
   toggleSidebar: [];
   clearSearch: [];
 }>();
 const kinds: ReportKind[] = ["早报", "午报", "晚报"];
+const themeOptions: { value: ThemePreference; label: string }[] = [
+  { value: "system", label: "跟随系统" },
+  { value: "light", label: "亮色" },
+  { value: "dark", label: "暗色" }
+];
+
+function themeLabel(option: ThemePreference, activeTheme: ThemeName) {
+  if (option !== "system") return themeOptions.find((item) => item.value === option)?.label ?? option;
+  return `跟随系统（${activeTheme === "dark" ? "暗色" : "亮色"}）`;
+}
 </script>
 
 <template>
@@ -61,6 +75,19 @@ const kinds: ReportKind[] = ["早报", "午报", "晚报"];
         {{ kind }}
       </button>
     </div>
+    <label class="themeControl">
+      <span class="themeControlLabel">主题</span>
+      <select
+        class="themeSelect"
+        :value="themePreference"
+        aria-label="主题设置"
+        @change="emit('update:themePreference', ($event.target as HTMLSelectElement).value as ThemePreference)"
+      >
+        <option v-for="option in themeOptions" :key="option.value" :value="option.value">
+          {{ themeLabel(option.value, activeTheme) }}
+        </option>
+      </select>
+    </label>
     <button class="iconButton" :disabled="loading" title="刷新" @click="emit('refresh')">刷新</button>
   </header>
 </template>

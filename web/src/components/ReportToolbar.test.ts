@@ -3,6 +3,7 @@ import { createSSRApp, h } from "vue";
 import { describe, expect, it } from "vitest";
 import ReportToolbar from "./ReportToolbar.vue";
 import type { ReportKind } from "../types/report";
+import type { ThemePreference } from "../theme";
 
 function renderToolbar(sidebarCollapsed: boolean, overrides: Record<string, unknown> = {}) {
   return renderToString(
@@ -13,6 +14,8 @@ function renderToolbar(sidebarCollapsed: boolean, overrides: Record<string, unkn
           selectedKinds: new Set<ReportKind>(),
           loading: false,
           sidebarCollapsed,
+          themePreference: "system" satisfies ThemePreference,
+          activeTheme: "dark",
           totalCount: 12,
           visibleCount: 4,
           ...overrides
@@ -50,5 +53,20 @@ describe("ReportToolbar", () => {
 
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-pressed="false"');
+  });
+
+  it("renders a theme setting that shows the active system theme", async () => {
+    const html = await renderToolbar(true);
+
+    expect(html).toContain('aria-label="主题设置"');
+    expect(html).toContain("跟随系统（暗色）");
+    expect(html).toContain("亮色");
+    expect(html).toContain("暗色");
+  });
+
+  it("marks the selected theme preference", async () => {
+    const html = await renderToolbar(true, { themePreference: "dark", activeTheme: "dark" });
+
+    expect(html).toContain('<select class="themeSelect" value="dark"');
   });
 });

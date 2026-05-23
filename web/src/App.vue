@@ -6,6 +6,8 @@ import ReportSidebar from "./components/ReportSidebar.vue";
 import ReportToolbar from "./components/ReportToolbar.vue";
 import { filterReports } from "./reportFilters";
 import { resolveVisibleSelection } from "./reportSelection";
+import { getStoredThemePreference, resolveTheme, setStoredThemePreference } from "./theme";
+import type { ThemePreference } from "./theme";
 import type { ReportDetail, ReportKind, ReportSummary } from "./types/report";
 
 const reports = ref<ReportSummary[]>([]);
@@ -19,12 +21,16 @@ const detailLoading = ref(false);
 const listError = ref<string>();
 const detailError = ref<string>();
 const isMobileViewport = ref(false);
+const themePreference = ref<ThemePreference>("system");
+const systemPrefersDark = ref(false);
 
 const filteredReports = computed(() => filterReports(reports.value, query.value, selectedKinds.value));
 const hasActiveFilters = computed(() => Boolean(query.value.trim()) || selectedKinds.value.size > 0);
 const readerEmptyMessage = computed(() => (hasActiveFilters.value ? "没有找到匹配报告" : "暂无报告"));
 const mobileDrawerOpen = computed(() => isMobileViewport.value && !sidebarCollapsed.value);
+const activeTheme = computed(() => resolveTheme(themePreference.value, systemPrefersDark.value));
 let mobileMediaQuery: MediaQueryList | undefined;
+let themeMediaQuery: MediaQueryList | undefined;
 
 async function loadReports() {
   listLoading.value = true;
@@ -76,6 +82,15 @@ function syncSidebarForViewport(event?: MediaQueryListEvent | MediaQueryList) {
   sidebarCollapsed.value = isMobileViewport.value;
 }
 
+function syncSystemTheme(event?: MediaQueryListEvent | MediaQueryList) {
+  systemPrefersDark.value = Boolean(event?.matches);
+}
+
+function updateThemePreference(preference: ThemePreference) {
+  themePreference.value = preference;
+  setStoredThemePreference(window.localStorage, preference);
+}
+
 watch(selectedId, (id) => {
   if (id) void loadDetail(id);
 });
@@ -88,8 +103,21 @@ watch(filteredReports, (visibleReports) => {
   }
 });
 
+watch(
+  activeTheme,
+  (theme) => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   void loadReports();
+  themePreference.value = getStoredThemePreference(window.localStorage);
+  themeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  syncSystemTheme(themeMediaQuery);
+  themeMediaQuery.addEventListener("change", syncSystemTheme);
   mobileMediaQuery = window.matchMedia("(max-width: 820px)");
   syncSidebarForViewport(mobileMediaQuery);
   mobileMediaQuery.addEventListener("change", syncSidebarForViewport);
@@ -98,6 +126,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   mobileMediaQuery?.removeEventListener("change", syncSidebarForViewport);
+  themeMediaQuery?.removeEventListener("change", syncSystemTheme);
   window.removeEventListener("keydown", handleKeydown);
 });
 </script>
@@ -126,9 +155,12 @@ onBeforeUnmount(() => {
         :selected-kinds="selectedKinds"
         :loading="listLoading"
         :sidebar-collapsed="sidebarCollapsed"
+        :theme-preference="themePreference"
+        :active-theme="activeTheme"
         :total-count="reports.length"
         :visible-count="filteredReports.length"
         @update:query="query = $event"
+        @update:theme-preference="updateThemePreference"
         @toggle-kind="toggleKind"
         @refresh="loadReports"
         @toggle-sidebar="sidebarCollapsed = !sidebarCollapsed"
