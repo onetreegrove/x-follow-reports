@@ -4,7 +4,7 @@ import sanitizeHtml from "sanitize-html";
 import { computed } from "vue";
 import type { ReportDetail } from "../types/report";
 
-const props = defineProps<{ report?: ReportDetail; loading: boolean; error?: string }>();
+const props = defineProps<{ report?: ReportDetail; loading: boolean; error?: string; emptyMessage?: string }>();
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true });
 
 const html = computed(() => {
@@ -25,7 +25,7 @@ const html = computed(() => {
   <main class="reader">
     <div v-if="loading" class="state">正在加载报告...</div>
     <div v-else-if="error" class="state error">{{ error }}</div>
-    <div v-else-if="!report" class="state">暂无报告</div>
+    <div v-else-if="!report" class="state">{{ emptyMessage || "暂无报告" }}</div>
     <article v-else>
       <div class="meta">
         <span>{{ report.generatedAt || report.date }}</span>

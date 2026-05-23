@@ -3,7 +3,13 @@ import { computed } from "vue";
 import { buildReportTree } from "../reportTree";
 import type { ReportSummary } from "../types/report";
 
-const props = defineProps<{ reports: ReportSummary[]; selectedId?: string; collapsed?: boolean }>();
+const props = defineProps<{
+  reports: ReportSummary[];
+  selectedId?: string;
+  collapsed?: boolean;
+  loading?: boolean;
+  error?: string;
+}>();
 const emit = defineEmits<{ select: [id: string]; "toggle-collapse": [] }>();
 
 const tree = computed(() => buildReportTree(props.reports));
@@ -37,34 +43,44 @@ function monthHasToday(month: string) {
     </button>
     <template v-if="!collapsed">
       <div class="brand">X Reports</div>
-      <details v-for="month in tree" :key="month.month" class="monthGroup" :open="monthHasToday(month.month)">
-        <summary class="monthLabel">{{ month.month }}</summary>
-        <details
-          v-for="day in month.days"
-          :key="`${month.month}-${day.day}`"
-          class="dayGroup"
-          :open="isToday(month.month, day.day)"
-        >
-          <summary class="dayLabel">{{ day.day }}</summary>
+      <div v-if="loading" class="sidebarState">正在加载报告列表...</div>
+      <div v-else-if="error" class="sidebarState error">{{ error }}</div>
+      <div v-else-if="tree.length === 0" class="sidebarState">没有匹配报告</div>
+      <template v-else>
+        <details v-for="month in tree" :key="month.month" class="monthGroup" :open="monthHasToday(month.month)">
+          <summary class="monthLabel">{{ month.month }}</summary>
           <details
-            v-for="kind in day.kinds"
-            :key="`${month.month}-${day.day}-${kind.kind}`"
-            class="kindGroup"
+            v-for="day in month.days"
+            :key="`${month.month}-${day.day}`"
+            class="dayGroup"
             :open="isToday(month.month, day.day)"
           >
-            <summary class="kindLabel">{{ kind.kind }}</summary>
-            <button
-              v-for="report in kind.reports"
-              :key="report.id"
-              class="reportItem"
-              :class="{ selected: report.id === selectedId }"
-              @click="emit('select', report.id)"
+            <summary class="dayLabel">{{ day.day }}</summary>
+            <details
+              v-for="kind in day.kinds"
+              :key="`${month.month}-${day.day}-${kind.kind}`"
+              class="kindGroup"
+              :open="isToday(month.month, day.day)"
             >
-              <span class="time">{{ report.time }}</span>
-            </button>
+              <summary class="kindLabel">{{ kind.kind }}</summary>
+              <button
+                v-for="report in kind.reports"
+                :key="report.id"
+                class="reportItem"
+                :class="{ selected: report.id === selectedId }"
+                :aria-current="report.id === selectedId ? 'true' : undefined"
+                :title="report.title"
+                @click="emit('select', report.id)"
+              >
+                <span class="reportItemTop">
+                  <span class="time">{{ report.time }}</span>
+                  <span v-if="report.itemCount" class="reportCount">{{ report.itemCount }} 条</span>
+                </span>
+              </button>
+            </details>
           </details>
         </details>
-      </details>
+      </template>
     </template>
   </aside>
 </template>

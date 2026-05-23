@@ -21,6 +21,13 @@ input {
   font: inherit;
 }
 
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
 .appShell {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
@@ -31,6 +38,10 @@ input {
 
 .appShell.sidebarCollapsed {
   grid-template-columns: 56px minmax(0, 1fr);
+}
+
+.drawerOverlay {
+  display: none;
 }
 
 .sidebar {
@@ -184,6 +195,25 @@ input {
   color: #174ea6;
 }
 
+.reportItemTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.reportCount {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.reportItem.selected .time,
+.reportItem.selected .reportCount {
+  color: #174ea6;
+}
+
 .time {
   color: #64748b;
   font-size: 12px;
@@ -210,13 +240,38 @@ input {
   z-index: 2;
 }
 
-.search {
+.searchWrap {
+  position: relative;
   flex: 1;
+  min-width: 180px;
+}
+
+.search {
+  width: 100%;
   border: 1px solid #cbd5e1;
   background: #fff;
   border-radius: 8px;
-  padding: 10px 12px;
-  min-width: 180px;
+  padding: 10px 38px 10px 12px;
+  min-width: 0;
+}
+
+.clearSearchButton {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.resultCount {
+  color: #64748b;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .kindFilters {
@@ -258,7 +313,8 @@ input {
 }
 
 .reader article {
-  max-width: 900px;
+  width: min(100%, 1500px);
+  max-width: calc(100% - 96px);
   margin: 0 auto;
   background: #fff;
   border: 1px solid #dde3ec;
@@ -354,6 +410,16 @@ input {
     z-index: 20;
   }
 
+  .drawerOverlay {
+    position: fixed;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: rgba(15, 23, 42, 0.28);
+    cursor: pointer;
+    z-index: 10;
+  }
+
   .sidebar.collapsed {
     width: min(84vw, 320px);
     height: 100dvh;
@@ -378,13 +444,18 @@ input {
     display: grid;
   }
 
-  .search {
+  .searchWrap {
     min-width: 0;
     flex: 1 1 calc(100% - 52px);
   }
 
-  .kindFilters {
+  .resultCount {
     order: 2;
+    width: 100%;
+  }
+
+  .kindFilters {
+    order: 3;
     width: 100%;
   }
 
@@ -393,7 +464,7 @@ input {
   }
 
   .iconButton {
-    order: 3;
+    order: 4;
     width: 100%;
   }
 

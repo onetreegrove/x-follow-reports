@@ -12,6 +12,7 @@ const reports: ReportSummary[] = [
     date: "2026-05/19",
     path: "2026-05/19/144437-晚报.md",
     excerpt: "",
+    itemCount: 16,
     createdAtMs: 2
   },
   {
@@ -25,14 +26,17 @@ const reports: ReportSummary[] = [
   }
 ];
 
-function renderSidebar(collapsed: boolean) {
+function renderSidebar(collapsed: boolean, overrides: Partial<InstanceType<typeof ReportSidebar>["$props"]> = {}) {
   return renderToString(
     createSSRApp({
       render: () =>
         h(ReportSidebar, {
           reports,
           selectedId: "morning",
-          collapsed
+          collapsed,
+          loading: false,
+          error: undefined,
+          ...overrides
         })
     })
   );
@@ -82,5 +86,27 @@ describe("ReportSidebar", () => {
     expect(html).toContain('<summary class="dayLabel">19</summary>');
     expect(html).toContain('<details class="dayGroup"><summary class="dayLabel">18</summary>');
     expect(html).toContain('<details class="kindGroup"><summary class="kindLabel">早报</summary>');
+  });
+
+  it("shows a sidebar error when the report list fails", async () => {
+    const html = await renderSidebar(false, { error: "报告列表加载失败" });
+
+    expect(html).toContain("报告列表加载失败");
+    expect(html).toContain("sidebarState error");
+  });
+
+  it("shows an empty sidebar state when no reports match", async () => {
+    const html = await renderSidebar(false, { reports: [] });
+
+    expect(html).toContain("没有匹配报告");
+    expect(html).toContain("sidebarState");
+  });
+
+  it("renders item count, title attribute, and current state in each report item", async () => {
+    const html = await renderSidebar(false, { selectedId: "late" });
+
+    expect(html).toContain('title="AI 开发者晚报"');
+    expect(html).toContain("16 条");
+    expect(html).toContain('aria-current="true"');
   });
 });
