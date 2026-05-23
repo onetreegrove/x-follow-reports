@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { appendFile, readFile, readdir, stat } from "node:fs/promises";
+import { appendFile, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
 
@@ -140,6 +140,20 @@ export async function resolveToken(
 }
 
 // ---------------------------------------------------------------------------
+// Report Backfill
+// ---------------------------------------------------------------------------
+
+export async function writeRemoteUrlToReport(reportPath: string, remoteUrl: string): Promise<void> {
+  const content = await readFile(reportPath, "utf8");
+  const remoteLine = `远端地址：${remoteUrl}`;
+  const withoutOldRemoteLine = content
+    .replace(/^远端地址：.*$(?:\r?\n)?/gm, "")
+    .replace(/\s+$/, "");
+
+  await writeFile(reportPath, `${withoutOldRemoteLine}\n\n${remoteLine}\n`, "utf8");
+}
+
+// ---------------------------------------------------------------------------
 // CLI Execution
 // ---------------------------------------------------------------------------
 
@@ -275,7 +289,9 @@ async function main() {
     if (response.status === 201) {
       const resBody = (await response.json()) as { report: { id: string }; url: string };
       const viewUrl = `${serverUrl.replace(/\/$/, "")}${resBody.url}`;
+      await writeRemoteUrlToReport(reportPath, viewUrl);
       console.error(`[server-reporter] 上报成功！`);
+      console.error(`[server-reporter] 远端地址已回写到报告：${reportPath}`);
       console.log(viewUrl);
     } else {
       let errorMessage = `HTTP 错误 ${response.status}`;

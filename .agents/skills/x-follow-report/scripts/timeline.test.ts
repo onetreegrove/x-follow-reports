@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { collectTimeline, formatMaterialsJson, parseExtendConfigText, parseExtendConfigTextWithWarnings, writeMaterialOutputs } from "./main.js";
+import { DEFAULT_CONFIG, mergeConfig } from "./config.js";
 import { extractTimelineTweets } from "./timeline.js";
 import { parseClientScriptUrls } from "./xapi.js";
 
@@ -118,6 +119,11 @@ unknown_key: value
       "include_replies 必须是布尔值",
       "未知配置项：unknown_key",
     ]);
+  });
+
+  test("mergeConfig defaults maxItems to 200", () => {
+    expect(DEFAULT_CONFIG.maxItems).toBe(200);
+    expect(mergeConfig({}).maxItems).toBe(200);
   });
 
   test("extractTimelineTweets normalizes records and bottom cursor", () => {

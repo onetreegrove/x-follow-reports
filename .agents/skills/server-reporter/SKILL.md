@@ -7,7 +7,7 @@ description: 将 x-follow-report 生成的报告通过 HTTP POST 上报至本地
 
 ## 概览
 
-将本地生成的 AI 开发者早/午/晚报 Markdown 报告上报到 `@[server]`。脚本会自动识别报告所属的日期与时段（早/午/晚报），通过 `POST /api/reports` 接口写入服务器。脚本不依赖任何外部大模型 API。
+将本地生成的 AI 开发者早/午/晚报 Markdown 报告上报到 `@[server]`。脚本会自动识别报告所属的日期与时段（早/午/晚报），通过 `POST /api/reports` 接口写入服务器。发布成功后，脚本会将远端查看地址回写到原 Markdown 报告中。脚本不依赖任何外部大模型 API。
 
 ## 使用方式
 
@@ -20,6 +20,7 @@ bun reporter.ts
 ```
 
 - **报告**：自动从本地 `.x-follow-report/report-outputs/` 或项目根目录下扫描最新的 `YYYY-MM/DD/*.md` 格式文件。
+- **回写**：真实上报成功后，将返回的远端地址写入原报告文档末尾，格式为 `远端地址：<url>`；如果已有 `远端地址：` 行则替换为最新地址并移动到文档末尾。
 - **配置与 Token**：按优先级依次查找：
   1. `--server-url` 和 `--token` 参数
   2. `REPORT_SERVER_URL` 和 `REPORT_UPLOAD_TOKEN` 环境变量
@@ -38,7 +39,7 @@ bun reporter.ts --server-url "http://127.0.0.1:8787" --token "your-secret-token"
 
 ### Dry-run 预检
 
-预检报告路径、内容大小与服务器配置，不实际发起网络请求：
+预检报告路径、内容大小与服务器配置，不实际发起网络请求，也不会回写报告文件：
 
 ```bash
 bun reporter.ts --dry-run
@@ -67,6 +68,23 @@ bun reporter.ts --report /path/to/report.md --dry-run
 4. 交互引导：若以上均未配置，脚本会提示用户输入，并自动追加写入 `.env`。
 
 `.env` 已在项目 `.gitignore` 中忽略，不会提交至 Git。
+
+## 发布后回写
+
+上报接口返回远端查看地址后，脚本必须把地址写回本地原 Markdown 报告：
+
+```markdown
+## 资讯
+
+...
+
+远端地址：https://x-ai.tuanshuji.cn/?report=...
+```
+
+回写规则：
+- 发布成功后将 `远端地址：...` 作为文档最后一行追加到报告末尾。
+- 如果报告中已经存在 `远端地址：...`，先移除旧行，再把最新地址写到文档末尾，不重复追加。
+- 只有真实发布成功后才回写；`--dry-run`、鉴权失败、网络失败、报告已存在但未覆盖等失败路径均不得修改原报告。
 
 ## 失败处理
 

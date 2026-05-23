@@ -35,12 +35,12 @@ function printUsage(exitCode: number): never {
 
 用法：
   ${cmd}
-  ${cmd} --timeline following --max-items 80 --lookback-hours 24
+  ${cmd} --timeline following --max-items 200 --lookback-hours 24
   ${cmd} --login
 
 选项：
   --timeline <following|home>     时间线类型，默认 following
-  --max-items <n>                 最多采集条目数，默认 100
+  --max-items <n>                 最多采集条目数，默认 200
   --lookback-hours <n>            回看小时数，默认 24
   --output-dir <path>             输出根目录，默认当前项目根目录
   --include-replies               包含回复

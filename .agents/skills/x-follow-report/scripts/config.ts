@@ -13,7 +13,7 @@ const PROJECT_ROOT = path.resolve(SCRIPT_DIR, "../../../..");
 export const DEFAULT_CONFIG: RunConfig = {
   outputDir: path.join(PROJECT_ROOT, ".x-follow-report", "report-outputs"),
   timeline: "following",
-  maxItems: 100,
+  maxItems: 200,
   lookbackHours: 24,
   includeReplies: false,
   includeReposts: true,

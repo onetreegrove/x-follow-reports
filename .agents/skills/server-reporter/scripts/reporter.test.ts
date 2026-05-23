@@ -1,9 +1,10 @@
 import { describe, expect, test, afterAll, beforeAll } from "bun:test";
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
-import { findLatestReport, resolveServerUrl, resolveToken } from "./reporter.js";
+import { findLatestReport, resolveServerUrl, resolveToken, writeRemoteUrlToReport } from "./reporter.js";
 
-const TEST_DIR = path.join(import.meta.dirname, "test-sandbox");
+const TEST_DIR = path.join(os.tmpdir(), "server-reporter-test-sandbox");
 
 describe("server-reporter configuration resolution", () => {
   test("resolveServerUrl prioritizes CLI argument over environment variables", async () => {
@@ -79,5 +80,58 @@ describe("server-reporter latest report scanner", () => {
     const latest = await findLatestReport(TEST_DIR);
     expect(latest).not.toBeNull();
     expect(latest).toContain("090000-早报.md");
+  });
+});
+
+describe("server-reporter report backfill", () => {
+  beforeAll(async () => {
+    await mkdir(TEST_DIR, { recursive: true });
+  });
+
+  afterAll(async () => {
+    await rm(TEST_DIR, { recursive: true, force: true });
+  });
+
+  test("writeRemoteUrlToReport appends remote URL to the end of the report", async () => {
+    const reportPath = path.join(TEST_DIR, "report.md");
+    await writeFile(reportPath, `# AI 开发者晚报
+
+生成时间：2026-05-22 17:46:29
+来源：X 关注时间线
+
+## 今日要点
+
+- Codex 更新
+`);
+
+    await writeRemoteUrlToReport(reportPath, "https://reports.example.com/?report=abc");
+
+    const updated = await readFile(reportPath, "utf8");
+    expect(updated).toEndWith("\n\n远端地址：https://reports.example.com/?report=abc\n");
+    expect(updated).toContain(`来源：X 关注时间线
+
+## 今日要点`);
+  });
+
+  test("writeRemoteUrlToReport moves and replaces an existing remote URL line", async () => {
+    const reportPath = path.join(TEST_DIR, "report-with-url.md");
+    await writeFile(reportPath, `# AI 开发者晚报
+
+生成时间：2026-05-22 17:46:29
+来源：X 关注时间线
+远端地址：https://old.example.com/?report=old
+
+## 今日要点
+`);
+
+    await writeRemoteUrlToReport(reportPath, "https://reports.example.com/?report=new");
+
+    const updated = await readFile(reportPath, "utf8");
+    expect(updated).not.toContain("https://old.example.com");
+    expect(updated.match(/^远端地址：/gm)).toHaveLength(1);
+    expect(updated).toEndWith("\n\n远端地址：https://reports.example.com/?report=new\n");
+    expect(updated).toContain(`来源：X 关注时间线
+
+## 今日要点`);
   });
 });

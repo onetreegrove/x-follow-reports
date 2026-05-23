@@ -17,6 +17,14 @@ type FeishuLinkElement = {
 
 type FeishuPostElement = FeishuTextElement | FeishuLinkElement;
 
+type ReportSummary = {
+  title: string;
+  generatedAt?: string;
+  source?: string;
+  remoteUrl?: string;
+  highlights: string[];
+};
+
 export type FeishuPostMessage = {
   msg_type: "post";
   content: {
@@ -32,8 +40,8 @@ export type FeishuPostMessage = {
 export function markdownLineToFeishuElements(raw: string): FeishuPostElement[] {
   let line = raw.trimEnd();
   if (!line.trim()) return [{ tag: "text", text: "" }];
-  if (line.startsWith("### ")) line = `\u25cc ${line.replace(/^###\s+/, "")}`;
-  else if (line.startsWith("## ")) line = `\u300c${line.replace(/^##\s+/, "")}\u300d`;
+  if (line.startsWith("### ")) line = line.replace(/^###\s+/, "");
+  else if (line.startsWith("## ")) line = line.replace(/^##\s+/, "");
   else if (line.startsWith("# ")) line = line.replace(/^#\s+/, "");
   if (line.startsWith("*   ")) line = `\u2022 ${line.slice(4)}`;
   if (line.startsWith("- ")) line = `\u2022 ${line.slice(2)}`;
@@ -53,6 +61,80 @@ export function markdownLineToFeishuElements(raw: string): FeishuPostElement[] {
   return out.length ? out : [{ tag: "text", text: "" }];
 }
 
+function stripMarkdownInline(raw: string): string {
+  return raw
+    .trim()
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, "$1 $2")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*/g, "")
+    .replace(/^[-*]\s+/, "")
+    .replace(/^#{1,6}\s+/, "")
+    .trim();
+}
+
+function parseMetaLine(line: string): { key: string; value: string } | null {
+  const cleaned = line.replace(/\*\*/g, "").trim();
+  const match = cleaned.match(/^([^:：]{2,12})[:：]\s*(.+)$/);
+  if (!match) return null;
+  return { key: match[1]!.trim(), value: match[2]!.trim() };
+}
+
+function extractRemoteUrl(markdown: string, metaLines: string[]): string | undefined {
+  const candidates = [...metaLines, ...markdown.split(/\r?\n/).slice(-30)];
+  for (const line of candidates) {
+    if (!/(远端地址|报告地址|在线地址|查看全文|完整报告|全文链接|remote|url)/i.test(line)) continue;
+    const match = line.match(/https?:\/\/\S+/);
+    if (match) return match[0]!.replace(/[)\]，。；;,.]+$/, "");
+  }
+  return undefined;
+}
+
+function extractSection(markdown: string, headingPattern: RegExp): string[] {
+  const lines = markdown.split(/\r?\n/);
+  const start = lines.findIndex((line) => headingPattern.test(line.trim()));
+  if (start < 0) return [];
+
+  const sectionLines: string[] = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (/^#{1,2}\s+/.test(line.trim())) break;
+    sectionLines.push(line);
+  }
+  return sectionLines;
+}
+
+export function extractReportSummary(markdown: string): ReportSummary {
+  const lines = markdown.split(/\r?\n/);
+  const title = lines.find((line) => line.startsWith("# "))?.replace(/^#\s+/, "").trim() || "AI 开发者报告";
+  const firstSection = lines.findIndex((line, index) => index > 0 && /^##\s+/.test(line.trim()));
+  const metaLines = (firstSection >= 0 ? lines.slice(1, firstSection) : lines.slice(1))
+    .map((line) => line.trim())
+    .filter((line) => line && line !== "---");
+
+  let generatedAt: string | undefined;
+  let source: string | undefined;
+  for (const line of metaLines) {
+    const meta = parseMetaLine(line);
+    if (!meta) continue;
+    if (/生成时间|时间|日期/.test(meta.key)) generatedAt = meta.value;
+    if (/来源|数据源/.test(meta.key)) source = meta.value;
+  }
+
+  const highlightLines = extractSection(markdown, /^##\s*(今日要点|核心要点|要点|摘要)\s*$/);
+  const highlights = highlightLines
+    .map(stripMarkdownInline)
+    .filter((line) => line && line !== "---")
+    .filter((line) => !/^#{1,6}\s+/.test(line));
+
+  return {
+    title,
+    generatedAt,
+    source,
+    remoteUrl: extractRemoteUrl(markdown, metaLines),
+    highlights,
+  };
+}
+
 function payloadSize(title: string, content: FeishuPostElement[][]): number {
   return Buffer.byteLength(JSON.stringify(toPayload(title, content)), "utf8");
 }
@@ -69,33 +151,6 @@ function toPayload(title: string, content: FeishuPostElement[][]): FeishuPostMes
       },
     },
   };
-}
-
-function markdownSections(markdown: string): { title: string; metaLines: string[]; sections: string[] } {
-  const lines = markdown.split(/\r?\n/);
-  const title = lines.find((line) => line.startsWith("# "))?.replace(/^#\s+/, "").trim() || "AI \u5f00\u53d1\u8005\u62a5\u544a";
-  const metaEnd = lines.findIndex((line) => line.trim() === "---");
-  let metaLines: string[];
-  let bodyLines: string[];
-
-  if (metaEnd >= 0) {
-    metaLines = lines.slice(1, metaEnd);
-    bodyLines = lines.slice(metaEnd + 1);
-  } else {
-    const firstSection = lines.findIndex((line, index) => index > 0 && /^##\s+/.test(line));
-    metaLines = firstSection >= 0 ? lines.slice(1, firstSection) : lines.slice(1);
-    bodyLines = firstSection >= 0 ? lines.slice(firstSection) : [];
-  }
-
-  const body = bodyLines.join("\n");
-  const sections = body
-    .replace(/\n(?=##\s+)/g, "\n---\n")
-    .replace(/\n(?=###\s+)/g, "\n---\n")
-    .split(/\n---\n/g)
-    .map((section) => section.trim())
-    .filter(Boolean);
-  metaLines = metaLines.map((line) => line.trim()).filter(Boolean);
-  return { title, metaLines, sections };
 }
 
 function elementText(element: FeishuPostElement): string {
@@ -127,51 +182,56 @@ export function buildFeishuPostMessages(options: {
   maxBytes?: number;
 }): FeishuPostMessage[] {
   const maxBytes = options.maxBytes ?? 13_000;
-  const { title, metaLines, sections } = markdownSections(options.markdown);
-  const introLines: FeishuPostElement[][] = [
-    [{ tag: "text", text: title }],
-    ...metaLines.map((line) => markdownLineToFeishuElements(line)),
-  ];
-  if (options.reportPath) introLines.push([{ tag: "text", text: `\u62a5\u544a\u8def\u5f84\uff1a${options.reportPath}` }]);
-  introLines.push([{ tag: "text", text: "" }]);
+  const summary = extractReportSummary(options.markdown);
+  const messageTitle = `${summary.title}｜今日要点`;
+  const introLines: FeishuPostElement[][] = [];
+  if (summary.generatedAt || summary.source) {
+    introLines.push([
+      {
+        tag: "text",
+        text: [summary.generatedAt ? `生成时间：${summary.generatedAt}` : "", summary.source ? `来源：${summary.source}` : ""]
+          .filter(Boolean)
+          .join("  |  "),
+      },
+    ]);
+  }
+  introLines.push([{ tag: "text", text: "" }], [{ tag: "text", text: "────────────────" }]);
 
+  const highlights = summary.highlights.length > 0 ? summary.highlights : ["这份报告没有找到“今日要点”章节，请打开完整报告查看。"];
+  const bodyLines = highlights.map((line, index) => markdownLineToFeishuElements(`${index + 1}. ${line}`));
+  const outroLines: FeishuPostElement[][] = [];
+  if (summary.remoteUrl) {
+    outroLines.push(
+      [{ tag: "text", text: "" }],
+      [{ tag: "a", text: "点击查看完整报告", href: summary.remoteUrl }],
+    );
+  }
+
+  const baseLines = [...introLines, ...bodyLines, ...outroLines];
   const messages: FeishuPostMessage[] = [];
-  let current = [...introLines];
+  let current: FeishuPostElement[][] = [];
   let part = 1;
-  const partTitle = () => `${title}\uff08${part}\uff09`;
+  const partTitle = () => (part === 1 ? messageTitle : `${messageTitle}（${part}）`);
   const pushCurrent = () => {
-    if (current.length <= introLines.length) return;
+    if (current.length === 0) return;
     messages.push(toPayload(partTitle(), current));
     part += 1;
-    current = [...introLines];
+    current = [];
   };
   const appendLine = (line: FeishuPostElement[]) => {
-    for (const chunk of splitOversizedLine(partTitle(), introLines, line, maxBytes)) {
+    for (const chunk of splitOversizedLine(partTitle(), [], line, maxBytes)) {
       const candidate = [...current, chunk];
-      if (payloadSize(partTitle(), candidate) > maxBytes && current.length > introLines.length) {
+      if (payloadSize(partTitle(), candidate) > maxBytes && current.length > 0) {
         pushCurrent();
       }
       current = [...current, chunk];
     }
   };
 
-  for (const section of sections) {
-    const sectionLines = section.split(/\r?\n/);
-    const isHeadingSection = /^#{2,3}\s+/.test(sectionLines[0]?.trim() ?? "");
-    const richLines = [
-      ...(isHeadingSection ? [[{ tag: "text" as const, text: "" }]] : []),
-      ...sectionLines.map(markdownLineToFeishuElements),
-      ...(isHeadingSection && /^###\s+/.test(sectionLines[0]?.trim() ?? "")
-        ? [[{ tag: "text" as const, text: "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500" }]]
-        : []),
-      [{ tag: "text" as const, text: "" }],
-    ];
-
-    for (const line of richLines) appendLine(line);
-  }
+  for (const line of baseLines) appendLine(line);
 
   pushCurrent();
-  if (messages.length === 0) messages.push(toPayload(title, introLines));
+  if (messages.length === 0) messages.push(toPayload(messageTitle, baseLines));
   return messages;
 }
 
@@ -205,14 +265,25 @@ export async function sendFeishuWebhook(webhook: string, messages: FeishuPostMes
  * projectRoot \u9ed8\u8ba4\u4e3a\u811a\u672c\u6240\u5728\u76ee\u5f55\u5411\u4e0a\u56db\u7ea7\uff08scripts/ \u2192 feishu-sender/ \u2192 skills/ \u2192 .agents/ \u2192 \u9879\u76ee\u6839\uff09
  */
 export async function findLatestReport(projectRoot: string): Promise<string | null> {
-  let monthDirs: string[] = [];
-  try {
-    const entries = await readdir(projectRoot);
-    monthDirs = entries
-      .filter((e) => /^\d{4}-\d{2}$/.test(e))
-      .map((e) => path.join(projectRoot, e));
-  } catch {
-    return null;
+  const candidateRoots = [
+    projectRoot,
+    path.join(projectRoot, ".x-follow-report", "report-outputs"),
+    path.join(projectRoot, "report-outputs"),
+  ];
+  const monthDirs: string[] = [];
+
+  for (const root of candidateRoots) {
+    let entries: string[] = [];
+    try {
+      entries = await readdir(root);
+    } catch {
+      continue;
+    }
+    monthDirs.push(
+      ...entries
+        .filter((e) => /^\d{4}-\d{2}$/.test(e))
+        .map((e) => path.join(root, e)),
+    );
   }
   if (monthDirs.length === 0) return null;
 
@@ -230,8 +301,9 @@ export async function findLatestReport(projectRoot: string): Promise<string | nu
       let files: string[] = [];
       try {
         files = (await readdir(dayDir))
-          .filter((e) => e.endsWith(".md"))
-          .map((e) => path.join(dayDir, e));
+        .filter((e) => e.endsWith(".md"))
+        .filter((e) => !/(预览|preview|template)/i.test(e))
+        .map((e) => path.join(dayDir, e));
       } catch {
         continue;
       }
