@@ -4,17 +4,14 @@ import { fetchReport, fetchReports } from "./api/reports";
 import ReportReader from "./components/ReportReader.vue";
 import ReportSidebar from "./components/ReportSidebar.vue";
 import ReportToolbar from "./components/ReportToolbar.vue";
-import { filterReports } from "./reportFilters";
 import { resolveVisibleSelection } from "./reportSelection";
 import { getStoredThemePreference, resolveTheme, setStoredThemePreference } from "./theme";
 import type { ThemePreference } from "./theme";
-import type { ReportDetail, ReportKind, ReportSummary } from "./types/report";
+import type { ReportDetail, ReportSummary } from "./types/report";
 
 const reports = ref<ReportSummary[]>([]);
 const selectedId = ref<string>();
 const selectedReport = ref<ReportDetail>();
-const query = ref("");
-const selectedKinds = ref(new Set<ReportKind>());
 const sidebarCollapsed = ref(false);
 const listLoading = ref(false);
 const detailLoading = ref(false);
@@ -24,9 +21,6 @@ const isMobileViewport = ref(false);
 const themePreference = ref<ThemePreference>("system");
 const systemPrefersDark = ref(false);
 
-const filteredReports = computed(() => filterReports(reports.value, query.value, selectedKinds.value));
-const hasActiveFilters = computed(() => Boolean(query.value.trim()) || selectedKinds.value.size > 0);
-const readerEmptyMessage = computed(() => (hasActiveFilters.value ? "没有找到匹配报告" : "暂无报告"));
 const mobileDrawerOpen = computed(() => isMobileViewport.value && !sidebarCollapsed.value);
 const activeTheme = computed(() => resolveTheme(themePreference.value, systemPrefersDark.value));
 let mobileMediaQuery: MediaQueryList | undefined;
@@ -37,7 +31,7 @@ async function loadReports() {
   listError.value = undefined;
   try {
     reports.value = await fetchReports();
-    selectedId.value = resolveVisibleSelection(filteredReports.value, selectedId.value);
+    selectedId.value = resolveVisibleSelection(reports.value, selectedId.value);
   } catch (err) {
     listError.value = err instanceof Error ? err.message : "报告列表加载失败";
   } finally {
@@ -55,13 +49,6 @@ async function loadDetail(id: string) {
   } finally {
     detailLoading.value = false;
   }
-}
-
-function toggleKind(kind: ReportKind) {
-  const next = new Set(selectedKinds.value);
-  if (next.has(kind)) next.delete(kind);
-  else next.add(kind);
-  selectedKinds.value = next;
 }
 
 function selectReport(id: string) {
@@ -95,7 +82,7 @@ watch(selectedId, (id) => {
   if (id) void loadDetail(id);
 });
 
-watch(filteredReports, (visibleReports) => {
+watch(reports, (visibleReports) => {
   const nextId = resolveVisibleSelection(visibleReports, selectedId.value);
   if (nextId !== selectedId.value) {
     selectedId.value = nextId;
@@ -134,7 +121,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="appShell" :class="{ sidebarCollapsed }">
     <ReportSidebar
-      :reports="filteredReports"
+      :reports="reports"
       :selected-id="selectedId"
       :collapsed="sidebarCollapsed"
       :loading="listLoading"
@@ -151,26 +138,19 @@ onBeforeUnmount(() => {
     ></button>
     <section class="mainPanel">
       <ReportToolbar
-        :query="query"
-        :selected-kinds="selectedKinds"
         :loading="listLoading"
         :sidebar-collapsed="sidebarCollapsed"
         :theme-preference="themePreference"
         :active-theme="activeTheme"
-        :total-count="reports.length"
-        :visible-count="filteredReports.length"
-        @update:query="query = $event"
         @update:theme-preference="updateThemePreference"
-        @toggle-kind="toggleKind"
         @refresh="loadReports"
         @toggle-sidebar="sidebarCollapsed = !sidebarCollapsed"
-        @clear-search="query = ''"
       />
       <ReportReader
         :report="selectedReport"
         :loading="detailLoading"
         :error="detailError"
-        :empty-message="readerEmptyMessage"
+        empty-message="暂无报告"
       />
     </section>
   </div>
