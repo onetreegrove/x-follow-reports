@@ -1,3 +1,12 @@
+## 0.3.0 - 2026-05-29
+
+### Features
+- Improve report reader user experience with an interactive Table of Contents (TOC), enhanced scrollbars, and improved responsive styling.
+- Add a custom favicon (`.ico` and `.svg`) to the web browser interface.
+
+### Documentation
+- Add comprehensive web UI interaction optimization plan and design documentation.
+
 ## 0.2.0 - 2026-05-23
 
 ### Features
