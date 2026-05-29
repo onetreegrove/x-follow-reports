@@ -7,8 +7,8 @@ export async function fetchReports(): Promise<ReportSummary[]> {
   return data.reports;
 }
 
-export async function fetchReport(id: string): Promise<ReportDetail> {
-  const response = await fetch(`/api/reports/${encodeURIComponent(id)}`);
+export async function fetchReport(id: string, signal?: AbortSignal): Promise<ReportDetail> {
+  const response = await fetch(`/api/reports/${encodeURIComponent(id)}`, { signal });
   if (!response.ok) throw new Error("报告详情加载失败");
   const data = await response.json();
   return data.report;

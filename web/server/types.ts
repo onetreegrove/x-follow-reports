@@ -1,26 +1,8 @@
-export type ReportKind = "早报" | "午报" | "晚报" | "未知";
-
-export type ReportSummary = {
-  id: string;
-  title: string;
-  kind: ReportKind;
-  date: string;
-  generatedAt?: string;
-  period?: string;
-  source?: string;
-  path: string;
-  excerpt: string;
-  itemCount?: number;
-  createdAtMs: number;
-};
-
-export type ReportDetail = ReportSummary & {
-  markdown: string;
-};
+export * from "../shared/types/report";
 
 export type PublishReportInput = {
   title?: string;
-  kind?: Exclude<ReportKind, "未知">;
+  kind?: Exclude<import("../shared/types/report").ReportKind, "未知">;
   generatedAt?: string;
   path?: string;
   content: string;
