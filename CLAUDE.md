@@ -11,3 +11,12 @@
 - 复杂批量重构：优先使用单个完整的 `python3 - <<'PY' ... PY` 脚本命令一次性完成，命令必须包含实际内容，避免分散操作或空工具调用。
 - 语言规则：与用户交流和回答问题时，必须使用中文。
 
+## 发布规范
+
+- **版本发布流程**:
+  1. 更新 `package.json` 和 `web/package.json` 中的 `version` 字段。
+  2. 在 `CHANGELOG.md` 中 prepend 相应的变更日志。
+  3. 提交变更：`git commit -m "chore: release v<version>"`。
+  4. 创建并推送附注 Tag：`git tag -a v<version> -m "..." && git push origin main && git push origin v<version>`。
+  5. **注意**: **不要**使用本地 CLI (`gh release create`) 手动创建 GitHub Release。仓库已配置了 GitHub Actions 自动化工作流 (`.github/workflows/release-web.yml`)，当检测到 `v*` Tag 推送时，会自动编译 Web 资源、打包并创建发布 GitHub Release 及附带部署产物 (`.tar.gz` 和 `.zip`)。
+
