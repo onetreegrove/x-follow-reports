@@ -86,12 +86,30 @@ async function readJson(req: IncomingMessage) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
+const MIME_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+};
+
 async function serveStatic(urlPath: string, res: ServerResponse) {
   const requested = urlPath === "/" ? "index.html" : urlPath.replace(/^\//, "");
   const filePath = path.join(process.cwd(), "dist", requested);
   try {
     const body = await readFile(filePath);
-    res.writeHead(200);
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] || "application/octet-stream";
+    res.writeHead(200, { "content-type": contentType });
     res.end(body);
   } catch {
     try {

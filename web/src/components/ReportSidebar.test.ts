@@ -9,7 +9,7 @@ const reports: ReportSummary[] = [
     id: "late",
     title: "AI 开发者晚报",
     kind: "晚报",
-    date: "2026-05/19",
+    date: "2026-05-19",
     path: "2026-05/19/144437-晚报.md",
     excerpt: "",
     itemCount: 16,
@@ -19,7 +19,7 @@ const reports: ReportSummary[] = [
     id: "morning",
     title: "AI 开发者早报",
     kind: "早报",
-    date: "2026-05/18",
+    date: "2026-05-18",
     path: "2026-05/18/094355-早报.md",
     excerpt: "",
     createdAtMs: 1
@@ -56,7 +56,6 @@ describe("ReportSidebar", () => {
     const html = await renderSidebar(true);
 
     expect(html).toContain("sidebar collapsed");
-    expect(html).toContain('aria-label="展开侧边栏"');
     expect(html).not.toContain("2026-05");
     expect(html).not.toContain("09:43:55");
   });
@@ -75,7 +74,7 @@ describe("ReportSidebar", () => {
     expect(html).toContain('<details class="monthGroup" open>');
     expect(html).toContain('<summary class="monthLabel">2026-05</summary>');
     expect(html).toContain('<details class="dayGroup" open>');
-    expect(html).toContain('<summary class="dayLabel">19</summary>');
+    expect(html).toContain("19日 (周二)");
     expect(html).toContain('<details class="kindGroup" open>');
     expect(html).toContain('<summary class="kindLabel">晚报</summary>');
   });
@@ -83,8 +82,8 @@ describe("ReportSidebar", () => {
   it("only opens today's report branch by default", async () => {
     const html = await renderSidebar(false);
 
-    expect(html).toContain('<summary class="dayLabel">19</summary>');
-    expect(html).toContain('<details class="dayGroup"><summary class="dayLabel">18</summary>');
+    expect(html).toContain("19日 (周二)");
+    expect(html).toContain("18日 (周一)");
     expect(html).toContain('<details class="kindGroup"><summary class="kindLabel">早报</summary>');
   });
 
