@@ -1,3 +1,12 @@
+## 0.3.1 - 2026-07-07
+
+### Fixes
+- Improve tweet source links in the web report reader by replacing raw X/Twitter URLs with readable "查看原文" link text while preserving the original target URL.
+- Tune the tweet source link typography so it fits the report reader's visual hierarchy.
+
+### Documentation
+- Document the repository release process for version bumps, changelog updates, annotated tags, and automated GitHub Release publishing.
+
 ## 0.3.0 - 2026-05-29
 
 ### Features
