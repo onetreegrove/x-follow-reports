@@ -659,6 +659,12 @@ summary:focus-visible {
   transition: all 0.2s ease;
 }
 
+.markdown a.tweetSourceLink {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 .markdown a:hover {
   border-color: var(--color-accent);
 }

@@ -21,12 +21,56 @@ const emit = defineEmits<{
 
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true });
 
+md.core.ruler.after("inline", "readable_tweet_source_links", (state) => {
+  for (const token of state.tokens) {
+    if (token.type !== "inline" || !token.children) continue;
+
+    for (let index = 0; index < token.children.length - 2; index += 1) {
+      const linkOpen = token.children[index];
+      const linkText = token.children[index + 1];
+      const linkClose = token.children[index + 2];
+      const href = linkOpen.attrGet("href");
+
+      if (
+        linkOpen.type === "link_open" &&
+        linkText.type === "text" &&
+        linkClose.type === "link_close" &&
+        href &&
+        isTweetSourceUrl(href) &&
+        normalizeUrlText(linkText.content) === normalizeUrlText(href)
+      ) {
+        linkOpen.attrJoin("class", "tweetSourceLink");
+        linkText.content = "查看原文";
+      }
+    }
+  }
+});
+
+function normalizeUrlText(value: string): string {
+  return value.trim().replace(/\/$/, "");
+}
+
+function isTweetSourceUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.replace(/^www\./, "");
+    const pathnameParts = url.pathname.split("/").filter(Boolean);
+
+    return (
+      (hostname === "x.com" || hostname === "twitter.com") &&
+      (pathnameParts.includes("status") || pathnameParts.includes("statuses"))
+    );
+  } catch {
+    return false;
+  }
+}
+
 const html = computed(() => {
   if (!props.report) return "";
   return sanitizeHtml(md.render(props.report.markdown), {
     allowedTags: sanitizeHtml.defaults.allowedTags.concat(["h1", "h2", "h3", "img"]),
     allowedAttributes: {
-      a: ["href", "name", "target", "rel"],
+      a: ["href", "name", "target", "rel", "class"],
       img: ["src", "alt", "title", "loading"]
     },
     transformTags: {
