@@ -66,6 +66,18 @@ function headers(cookieMap: Record<string, string>): Record<string, string> {
   return h;
 }
 
+function browserHeaders(cookieMap: Record<string, string>): Record<string, string> {
+  const userAgent = process.env.X_USER_AGENT?.trim() || DEFAULT_USER_AGENT;
+  const h: Record<string, string> = {
+    "user-agent": userAgent,
+    accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "accept-language": "en",
+  };
+  const cookie = buildCookieHeader(cookieMap);
+  if (cookie) h.cookie = cookie;
+  return h;
+}
+
 function safeUrlLabel(rawUrl: string): string {
   try {
     const parsed = new URL(rawUrl);
@@ -105,6 +117,24 @@ export function parseClientScriptUrls(html: string): string[] {
   return Array.from(urls);
 }
 
+export function parseTimelineChunkUrls(html: string): string[] {
+  const names = new Map<string, string>();
+  for (const match of html.matchAll(/(\d+):"([^"]*HomeTimeline[^"]*)"/g)) {
+    if (match[1] && match[2]) names.set(match[1], match[2]);
+  }
+
+  const urls = new Set<string>();
+  // X changes chunk hash lengths; match the full hexadecimal hash.
+  for (const match of html.matchAll(/(\d+):"([a-f0-9]+)"/g)) {
+    const name = match[1] ? names.get(match[1]) : undefined;
+    const hash = match[2];
+    if (name && hash) {
+      urls.add(`https://abs.twimg.com/responsive-web/client-web/${name}.${hash}a.js`);
+    }
+  }
+  return Array.from(urls);
+}
+
 function parseOperationQueryId(source: string, operationName: string): string | null {
   const patterns = [
     new RegExp(`queryId:\\\"([^\\\"]+)\\\",operationName:\\\"${operationName}\\\"`),
@@ -118,7 +148,7 @@ function parseOperationQueryId(source: string, operationName: string): string | 
   return null;
 }
 
-async function discoverQueryInfo(timeline: TimelineKind): Promise<QueryInfo> {
+async function discoverQueryInfo(timeline: TimelineKind, cookieMap: Record<string, string>): Promise<QueryInfo> {
   const operationName = timeline === "following" ? "HomeLatestTimeline" : "HomeTimeline";
   const envName = timeline === "following" ? "X_FOLLOWING_TIMELINE_QUERY_ID" : "X_HOME_TIMELINE_QUERY_ID";
   const envQueryId = process.env[envName]?.trim();
@@ -126,9 +156,10 @@ async function discoverQueryInfo(timeline: TimelineKind): Promise<QueryInfo> {
     return { queryId: envQueryId, operationName, features: DEFAULT_FEATURES, fieldToggles: DEFAULT_FIELD_TOGGLES };
   }
 
-  const userAgent = process.env.X_USER_AGENT?.trim() || DEFAULT_USER_AGENT;
-  const html = await fetchText("https://x.com", { headers: { "user-agent": userAgent } });
+  const fetchHeaders = browserHeaders(cookieMap);
+  const html = await fetchText("https://x.com/home", { headers: fetchHeaders });
   const scriptUrls = parseClientScriptUrls(html);
+  for (const chunkUrl of parseTimelineChunkUrls(html)) scriptUrls.push(chunkUrl);
   const apiHash = parseApiChunkHash(html);
   if (apiHash) scriptUrls.unshift(`https://abs.twimg.com/responsive-web/client-web/api.${apiHash}a.js`);
   if (scriptUrls.length === 0) {
@@ -136,7 +167,7 @@ async function discoverQueryInfo(timeline: TimelineKind): Promise<QueryInfo> {
   }
 
   for (const scriptUrl of Array.from(new Set(scriptUrls))) {
-    const chunk = await fetchText(scriptUrl, { headers: { "user-agent": userAgent } });
+    const chunk = await fetchText(scriptUrl, { headers: fetchHeaders });
     const queryId = parseOperationQueryId(chunk, operationName);
     if (queryId) {
       return { queryId, operationName, features: DEFAULT_FEATURES, fieldToggles: DEFAULT_FIELD_TOGGLES };
@@ -164,7 +195,7 @@ export async function fetchTimelinePage(options: {
   count: number;
   cursor?: string;
 }): Promise<unknown> {
-  const query = await discoverQueryInfo(options.timeline);
+  const query = await discoverQueryInfo(options.timeline, options.cookieMap);
   const url = new URL(`https://x.com/i/api/graphql/${query.queryId}/${query.operationName}`);
   url.searchParams.set("variables", JSON.stringify(buildVariables(options.timeline, options.count, options.cursor)));
   url.searchParams.set("features", JSON.stringify(query.features));

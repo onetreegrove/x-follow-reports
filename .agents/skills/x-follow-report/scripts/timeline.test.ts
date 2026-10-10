@@ -6,7 +6,7 @@ import path from "node:path";
 import { collectTimeline, formatMaterialsJson, parseExtendConfigText, parseExtendConfigTextWithWarnings, writeMaterialOutputs } from "./main.js";
 import { DEFAULT_CONFIG, mergeConfig } from "./config.js";
 import { extractTimelineTweets } from "./timeline.js";
-import { parseClientScriptUrls } from "./xapi.js";
+import { parseClientScriptUrls, parseTimelineChunkUrls } from "./xapi.js";
 
 const fixture = {
   data: {
@@ -209,6 +209,30 @@ unknown_key: value
     expect(urls).toEqual([
       "https://abs.twimg.com/responsive-web/client-web/main.4a4db2da.js",
       "https://abs.twimg.com/responsive-web/client-web/api.deadbeefa.js",
+    ]);
+  });
+
+  test("parseTimelineChunkUrls discovers logged-in HomeTimeline chunks", () => {
+    const urls = parseTimelineChunkUrls(`
+      12345:"bundle.HomeTimeline",44924:"shared~bundle.LoggedInMain~bundle.Compose~bundle.HomeTimeline"
+      12345:"abc1234",44924:"734a8d3",54321:"9999999"
+    `);
+
+    expect(urls).toEqual([
+      "https://abs.twimg.com/responsive-web/client-web/bundle.HomeTimeline.abc1234a.js",
+      "https://abs.twimg.com/responsive-web/client-web/shared~bundle.LoggedInMain~bundle.Compose~bundle.HomeTimeline.734a8d3a.js",
+    ]);
+  });
+
+  test("parseTimelineChunkUrls discovers current 16-character hashes", () => {
+    const urls = parseTimelineChunkUrls(`
+      53852:"shared~bundle.Compose~bundle.HomeTimeline~bundle.LoggedInMain",69195:"bundle.HomeTimeline",99999:"bundle.Other"
+      53852:"1cdb22bea28851b4",69195:"dc4f002bb3b0d51c",99999:"0123456789abcdef"
+    `);
+
+    expect(urls).toEqual([
+      "https://abs.twimg.com/responsive-web/client-web/shared~bundle.Compose~bundle.HomeTimeline~bundle.LoggedInMain.1cdb22bea28851b4a.js",
+      "https://abs.twimg.com/responsive-web/client-web/bundle.HomeTimeline.dc4f002bb3b0d51ca.js",
     ]);
   });
 
